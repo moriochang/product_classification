@@ -162,8 +162,8 @@
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon">📁</div>
             <div class="upload-text">點擊上傳或拖曳 Excel 檔案到這裡</div>
-            <div class="upload-text" style="font-size: 14px; color: #999;">支援 .xlsx, .xls 格式</div>
-            <input type="file" id="fileInput" accept=".xlsx,.xls">
+            <div class="upload-text" style="font-size: 14px; color: #999;">支援 .xlsx, .xls, .csv 格式</div>
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
         </div>
 
         <div class="file-name" id="fileName"></div>
@@ -206,11 +206,45 @@
             },
             {
                 name: 'iPad',
-                check: (name) => name.includes('ipad')
+                check: (name) => {
+                    // 包含 ipad 但不包含鍵盤相關關鍵字
+                    return name.includes('ipad') && 
+                           !name.includes('keyboard') && 
+                           !name.includes('鍵盤') &&
+                           !name.includes('kb');
+                }
             },
             {
                 name: 'iPhone',
-                check: (name) => name.includes('iphone')
+                check: (name) => {
+                    // 包含 iphone 但不包含殼類關鍵字
+                    const hasIphone = name.includes('iphone');
+                    
+                    // 排除所有殼類產品的關鍵字
+                    const excludeKeywords = [
+                        '透明殼', '矽膠殼', '織紋殼', '保護殼',
+                        'mgf2', 'mgft', 'mgfw', 'mgev', 'mgew', 'mgex', 'mgf0', 'mgf1', // iPhone 17 殼
+                        'mgh2', 'mgh3', // iPhone Air 保護殼
+                        'mgfe', 'mgff', 'mgfg', 'mgfh', 'mgfj', 'mgfk', // iPhone 17P 矽膠殼
+                        'mgf3', 'mgf4', 'mgf5', 'mgf6', 'mgf7', // iPhone 17P 織紋殼
+                        'mgfl', 'mgfm', 'mgfn', 'mgfp', 'mgfq', 'mgfr', // iPhone 17PM 矽膠殼
+                        'mgf8', 'mgf9', 'mgfa', 'mgfc', 'mgfd', // iPhone 17PM 織紋殼
+                        'case'
+                    ];
+                    
+                    const hasCase = excludeKeywords.some(keyword => name.includes(keyword));
+                    
+                    // 除錯訊息
+                    if (hasIphone) {
+                        console.log(`  iPhone檢查: "${name}"`, { 
+                            hasIphone, 
+                            hasCase,
+                            result: hasIphone && !hasCase 
+                        });
+                    }
+                    
+                    return hasIphone && !hasCase;
+                }
             },
             {
                 name: 'AW',
@@ -263,8 +297,8 @@
 
         function handleFile(file) {
             // 檢查檔案類型
-            if (!file.name.match(/\.(xlsx|xls)$/)) {
-                showError('請上傳 Excel 檔案 (.xlsx 或 .xls)');
+            if (!file.name.match(/\.(xlsx|xls|csv)$/)) {
+                showError('請上傳 Excel 或 CSV 檔案 (.xlsx, .xls 或 .csv)');
                 return;
             }
 
@@ -276,7 +310,14 @@
             reader.onload = (e) => {
                 try {
                     const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
+                    // 加入編碼處理選項
+                    const workbook = XLSX.read(data, { 
+                        type: 'array',
+                        codepage: 65001, // UTF-8
+                        cellDates: true,
+                        cellNF: false,
+                        cellText: false
+                    });
                     processExcel(workbook);
                 } catch (err) {
                     showError('讀取檔案時發生錯誤: ' + err.message);
@@ -289,14 +330,19 @@
             try {
                 // 取得第一個工作表
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                // 加入編碼處理選項
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, {
+                    raw: false,
+                    defval: ''
+                });
 
                 if (jsonData.length === 0) {
                     showError('Excel 檔案是空的');
                     return;
                 }
 
-                console.log('讀取到的資料:', jsonData);
+                console.log('讀取到的資料（前3筆）:', jsonData.slice(0, 3));
+                console.log('第一筆資料的欄位:', Object.keys(jsonData[0]));
 
                 // 初始化分類統計
                 const categoryStats = {
