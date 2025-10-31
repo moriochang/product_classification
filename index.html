@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>產品分類統計工具</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            text-align: center;
+            font-size: 28px;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f8f9ff;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background: #e8ebff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .results {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .results.show {
+            display: block;
+        }
+
+        .category-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .category-name {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .category-quantity {
+            font-size: 32px;
+            font-weight: bold;
+        }
+
+        .total-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(245, 87, 108, 0.3);
+        }
+
+        .error {
+            color: #f5576c;
+            padding: 15px;
+            background: #ffe8eb;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .file-name {
+            margin-top: 15px;
+            color: #667eea;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 產品分類統計工具</h1>
+        
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📁</div>
+            <div class="upload-text">點擊上傳或拖曳 Excel 檔案到這裡</div>
+            <div class="upload-text" style="font-size: 14px; color: #999;">支援 .xlsx, .xls 格式</div>
+            <input type="file" id="fileInput" accept=".xlsx,.xls">
+        </div>
+
+        <div class="file-name" id="fileName"></div>
+        <div class="error" id="error"></div>
+
+        <div class="results" id="results">
+            <h2 style="margin-bottom: 20px; color: #333;">📈 統計結果</h2>
+            <div id="categoriesContainer"></div>
+            <div class="total-card">
+                <div class="category-name">總計</div>
+                <div class="category-quantity" id="totalQuantity">0</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileName = document.getElementById('fileName');
+        const error = document.getElementById('error');
+        const results = document.getElementById('results');
+        const categoriesContainer = document.getElementById('categoriesContainer');
+        const totalQuantity = document.getElementById('totalQuantity');
+
+        // 分類規則 - 按照順序匹配，先匹配到的優先
+        // 順序很重要：AC+ → CPU → iPad → iPhone → AW → AirPods
+        const categoryRules = [
+            {
+                name: 'AC+',
+                check: (name) => name.includes('ac+') || name.includes('applecare')
+            },
+            {
+                name: 'CPU',
+                check: (name) => name.includes('mac')
+            },
+            {
+                name: 'iPad',
+                check: (name) => name.includes('ipad')
+            },
+            {
+                name: 'iPhone',
+                check: (name) => name.includes('iphone')
+            },
+            {
+                name: 'AW',
+                check: (name) => {
+                    // 匹配 AW 開頭加上特定型號
+                    return name.includes('aw s') || 
+                           name.includes('aw se') || 
+                           name.includes('aw ultra') ||
+                           name.includes('apple watch s') ||
+                           name.includes('apple watch se') ||
+                           name.includes('apple watch ultra');
+                }
+            },
+            {
+                name: 'AirPods',
+                check: (name) => name.includes('airpod')
+            }
+        ];
+
+        // 點擊上傳區域
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // 拖曳功能
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        // 檔案選擇
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            // 檢查檔案類型
+            if (!file.name.match(/\.(xlsx|xls)$/)) {
+                showError('請上傳 Excel 檔案 (.xlsx 或 .xls)');
+                return;
+            }
+
+            fileName.textContent = `已選擇檔案: ${file.name}`;
+            error.classList.remove('show');
+
+            // 讀取檔案
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    processExcel(workbook);
+                } catch (err) {
+                    showError('讀取檔案時發生錯誤: ' + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function processExcel(workbook) {
+            try {
+                // 取得第一個工作表
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+                if (jsonData.length === 0) {
+                    showError('Excel 檔案是空的');
+                    return;
+                }
+
+                console.log('讀取到的資料:', jsonData);
+
+                // 初始化分類統計
+                const categoryStats = {
+                    'CPU': 0,
+                    'iPad': 0,
+                    'iPhone': 0,
+                    'AW': 0,
+                    'AirPods': 0,
+                    'AC+': 0
+                };
+
+                // 找出正確的欄位名稱
+                const firstRow = jsonData[0];
+                const productNameKey = Object.keys(firstRow).find(key => 
+                    key.toLowerCase().includes('product') || key.toLowerCase().includes('name') || key.toLowerCase().includes('產品')
+                );
+                const quantityKey = Object.keys(firstRow).find(key => 
+                    key.toLowerCase().includes('quantity') || key.toLowerCase().includes('數量') || key.toLowerCase().includes('qty')
+                );
+
+                console.log('使用的欄位:', { productNameKey, quantityKey });
+
+                if (!productNameKey || !quantityKey) {
+                    showError('找不到 "product name" 或 "Quantity" 欄位，請確認 Excel 欄位名稱');
+                    return;
+                }
+
+                // 處理每一筆資料
+                let unclassifiedItems = [];
+                jsonData.forEach((row, index) => {
+                    const productName = (row[productNameKey] || '').toString().toLowerCase().trim();
+                    const quantity = parseFloat(row[quantityKey]) || 0;
+
+                    console.log(`第 ${index + 1} 筆:`, { productName, quantity });
+
+                    if (!productName) {
+                        console.log('產品名稱為空，跳過');
+                        return;
+                    }
+
+                    // 按順序檢查分類規則，找到第一個匹配的就分類
+                    let classified = false;
+                    for (const rule of categoryRules) {
+                        if (rule.check(productName)) {
+                            categoryStats[rule.name] += quantity;
+                            console.log(`✓ 分類到 ${rule.name}: ${productName} (數量: ${quantity})`);
+                            classified = true;
+                            break; // 找到第一個匹配就停止，不會重複分類
+                        }
+                    }
+
+                    // 記錄未分類的產品
+                    if (!classified) {
+                        unclassifiedItems.push({ name: productName, quantity });
+                        console.log('✗ 未分類:', productName);
+                    }
+                });
+
+                // 顯示未分類項目
+                if (unclassifiedItems.length > 0) {
+                    console.warn('未分類的產品:', unclassifiedItems);
+                }
+
+                displayResults(categoryStats);
+            } catch (err) {
+                showError('處理資料時發生錯誤: ' + err.message);
+                console.error(err);
+            }
+        }
+
+        function displayResults(stats) {
+            categoriesContainer.innerHTML = '';
+            let total = 0;
+
+            // 顯示各分類
+            for (const [category, quantity] of Object.entries(stats)) {
+                total += quantity;
+                const card = document.createElement('div');
+                card.className = 'category-card';
+                card.innerHTML = `
+                    <div class="category-name">${category}</div>
+                    <div class="category-quantity">${quantity}</div>
+                `;
+                categoriesContainer.appendChild(card);
+            }
+
+            // 顯示總計
+            totalQuantity.textContent = total;
+            results.classList.add('show');
+        }
+
+        function showError(message) {
+            error.textContent = message;
+            error.classList.add('show');
+            results.classList.remove('show');
+        }
+    </script>
+</body>
+</html>
