@@ -197,7 +197,12 @@
             },
             {
                 name: 'CPU',
-                check: (name) => name.includes('mac')
+                check: (name) => {
+                    // 匹配 MBA、MBP 或 Mac
+                    return name.includes('mba') || 
+                           name.includes('mbp') || 
+                           name.includes('mac');
+                }
             },
             {
                 name: 'iPad',
