@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>產品分類統計工具</title>
+    <title>每日業績統計</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         * {
@@ -14,20 +14,19 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            /* 背景加深 */
+            background: linear-gradient(135deg, #102040 0%, #1a3560 100%);
             min-height: 100vh;
             padding: 20px;
-            /* 🎯 版面還原: 移除 Flexbox 相關設定 */
         }
 
         .container {
             max-width: 1000px;
-            margin: 0 auto; /* 🎯 版面還原: 底部邊距已移除 */
+            margin: 0 auto;
             background: white;
             border-radius: 20px;
             padding: 40px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            /* 🎯 版面還原: 移除 flex-grow */
         }
 
         h1 {
@@ -47,7 +46,8 @@
         .upload-area {
             border: 3px dashed #2a5298;
             border-radius: 15px;
-            padding: 40px;
+            /* 🎯 上傳區塊縮小 20%： 40px -> 32px */
+            padding: 32px;
             text-align: center;
             margin-bottom: 30px;
             cursor: pointer;
@@ -277,17 +277,17 @@
 
         /* Footer 樣式 */
         .footer {
-            margin-top: 20px; /* 加上邊距 */
+            margin-top: 20px;
             padding: 10px 0;
             text-align: center;
-            color: rgba(255, 255, 255, 0.7); /* 淺白色文字，與背景融合 */
+            color: rgba(255, 255, 255, 0.7);
             font-size: 14px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📊 產品分類統計工具</h1>
+        <h1>📊 每日業績統計</h1>
         
         <div class="config-section">
             <div class="config-label">GitHub 參照資料網址：</div>
@@ -307,9 +307,6 @@
             <div class="upload-icon">📁</div>
             <div class="upload-text">點擊上傳或拖曳 Excel 檔案到這裡</div>
             <div class="upload-text" style="font-size: 14px; color: #999;">支援 .xlsx, .xls, .csv 格式</div>
-            <div class="upload-text" style="font-size: 12px; color: #999; margin-top: 10px;">
-                需包含 product_code 和 amt 欄位
-            </div>
             <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
         </div>
 
@@ -338,7 +335,7 @@
     </div>
     
     <footer class="footer">
-        created by Morio © 2025
+        Created by Morio © 2025
     </footer>
     <script>
         let codeCategoryMap = null; // { code: { category: '大分類', subCategory: '中分類' } }
