@@ -570,7 +570,7 @@
                 const unmatchedCodes = [];
 
                 jsonData.forEach((row, index) => {
-                    const productCode = String(row[codeKey] || '').trim();
+                    const productCode = String(row[codeKey] || '').trim().padStart(10, '0');
                     const quantity = parseFloat(row[quantityKey]) || 0;
                     const amt = parseFloat(row[amtKey]) || 0;
 
