@@ -570,7 +570,7 @@
                 const unmatchedCodes = [];
 
                 jsonData.forEach((row, index) => {
-                    const productCode = String(row[codeKey] || '').trim().padStart(10, '0');
+                    const productCode = String(row[codeKey] || '').trim();
                     const quantity = parseFloat(row[quantityKey]) || 0;
                     const amt = parseFloat(row[amtKey]) || 0;
 
@@ -591,8 +591,10 @@
                         }
 
                         // 2. 🎯 周邊業績統計 (AirPods 計金額，並與周邊產品一起統計)
-                        if (accessoryCategories.includes(category)) {
-                            accessoryStats[category] += amt;
+                        // Bundle 歸入 3rd Party 計算
+                        const accessoryCategory = category === 'Bundle' ? '3rd Party' : category;
+                        if (accessoryCategories.includes(accessoryCategory)) {
+                            accessoryStats[accessoryCategory] += amt;
                         }
 
                         // 3. Top 3 中分類 Quantity 統計邏輯
