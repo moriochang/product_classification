@@ -600,18 +600,20 @@
                             accessoryStats[accessoryCategory] += amt;
                         }
 
-                        // 3. Top 3 中分類 Quantity 統計邏輯（3rd Party 用金額全展開含小分類）
+                        // 3. Top 3 中分類 Quantity 統計邏輯（3rd Party 用金額+數量全展開含小分類）
                         const effectiveCategory = category === 'Bundle' ? '3rd Party' : category;
                         if (effectiveCategory === '3rd Party') {
-                            // 3rd Party: 全部中分類展開，再細分小分類，統計金額
+                            // 3rd Party: 全部中分類展開，再細分小分類，統計金額+數量
                             if (!subCategoryStats['3rd Party']) subCategoryStats['3rd Party'] = {};
-                            if (!subCategoryStats['3rd Party'][subCategory]) subCategoryStats['3rd Party'][subCategory] = { amt: 0, small: {} };
+                            if (!subCategoryStats['3rd Party'][subCategory]) subCategoryStats['3rd Party'][subCategory] = { amt: 0, qty: 0, small: {} };
                             subCategoryStats['3rd Party'][subCategory].amt += amt;
+                            subCategoryStats['3rd Party'][subCategory].qty += quantity;
                             if (smallCategory) {
                                 if (!subCategoryStats['3rd Party'][subCategory].small[smallCategory]) {
-                                    subCategoryStats['3rd Party'][subCategory].small[smallCategory] = 0;
+                                    subCategoryStats['3rd Party'][subCategory].small[smallCategory] = { amt: 0, qty: 0 };
                                 }
-                                subCategoryStats['3rd Party'][subCategory].small[smallCategory] += amt;
+                                subCategoryStats['3rd Party'][subCategory].small[smallCategory].amt += amt;
+                                subCategoryStats['3rd Party'][subCategory].small[smallCategory].qty += quantity;
                             }
                         } else if (top3Categories.includes(effectiveCategory)) {
                             if (!subCategoryStats[effectiveCategory]) subCategoryStats[effectiveCategory] = {};
@@ -680,10 +682,10 @@
             return `<div class="top3-card">${html}</div>`;
         }
 
-        // 3rd Party 全展開：中分類 → 小分類，統計金額
+        // 3rd Party 全展開：中分類 → 小分類，統計數量+金額
         function render3rdParty(stats) {
             const subCats = Object.entries(stats)
-                .map(([name, data]) => ({ name, amt: data.amt, small: data.small }))
+                .map(([name, data]) => ({ name, amt: data.amt, qty: data.qty, small: data.small }))
                 .sort((a, b) => b.amt - a.amt);
 
             let html = `<div class="top3-category-title">3rd Party</div>`;
@@ -695,17 +697,23 @@
                         <div class="top3-item" style="flex-direction:column; align-items:flex-start; padding:8px 12px;">
                             <div style="display:flex; justify-content:space-between; width:100%; font-weight:600; color:#1e3c72;">
                                 <span>${sub.name}</span>
-                                <span>$${Math.round(sub.amt).toLocaleString()}</span>
+                                <span style="text-align:right;">
+                                    <span style="color:#888; font-size:0.85em; margin-right:8px;">${sub.qty}台</span>
+                                    $${Math.round(sub.amt).toLocaleString()}
+                                </span>
                             </div>`;
                     const smallItems = Object.entries(sub.small)
-                        .map(([k, v]) => ({ name: k, amt: v }))
+                        .map(([k, v]) => ({ name: k, amt: v.amt, qty: v.qty }))
                         .sort((a, b) => b.amt - a.amt);
                     if (smallItems.length > 0) {
                         smallItems.forEach(sm => {
                             html += `
                             <div style="display:flex; justify-content:space-between; width:100%; padding-left:16px; color:#555; font-size:0.85em; margin-top:3px;">
                                 <span>└ ${sm.name}</span>
-                                <span>$${Math.round(sm.amt).toLocaleString()}</span>
+                                <span style="text-align:right;">
+                                    <span style="color:#aaa; margin-right:8px;">${sm.qty}台</span>
+                                    $${Math.round(sm.amt).toLocaleString()}
+                                </span>
                             </div>`;
                         });
                     }
