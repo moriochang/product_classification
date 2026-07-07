@@ -398,10 +398,12 @@
                     const code = String(row.Code || '').trim();
                     const category = String(row['大分類'] || '').trim();
                     const subCategory = String(row['中分類'] || '').trim(); // 讀取中分類
+                    const smallCategory = String(row['小分類'] || '').trim(); // 讀取小分類
                     if (code && category && subCategory) {
                         codeCategoryMap[code] = {
                             category: category,
-                            subCategory: subCategory
+                            subCategory: subCategory,
+                            smallCategory: smallCategory
                         };
                     }
                 });
@@ -584,6 +586,7 @@
                         matchedCount++;
                         const category = categoryData.category;
                         const subCategory = categoryData.subCategory;
+                        const smallCategory = categoryData.smallCategory || '';
 
                         // 1. 產品數量統計 (AirPods 計數量)
                         if (productCategories.includes(category)) {
@@ -597,15 +600,23 @@
                             accessoryStats[accessoryCategory] += amt;
                         }
 
-                        // 3. Top 3 中分類 Quantity 統計邏輯
-                        if (top3Categories.includes(category)) {
-                            if (!subCategoryStats[category]) {
-                                subCategoryStats[category] = {};
+                        // 3. Top 3 中分類 Quantity 統計邏輯（3rd Party 用金額全展開含小分類）
+                        const effectiveCategory = category === 'Bundle' ? '3rd Party' : category;
+                        if (effectiveCategory === '3rd Party') {
+                            // 3rd Party: 全部中分類展開，再細分小分類，統計金額
+                            if (!subCategoryStats['3rd Party']) subCategoryStats['3rd Party'] = {};
+                            if (!subCategoryStats['3rd Party'][subCategory]) subCategoryStats['3rd Party'][subCategory] = { amt: 0, small: {} };
+                            subCategoryStats['3rd Party'][subCategory].amt += amt;
+                            if (smallCategory) {
+                                if (!subCategoryStats['3rd Party'][subCategory].small[smallCategory]) {
+                                    subCategoryStats['3rd Party'][subCategory].small[smallCategory] = 0;
+                                }
+                                subCategoryStats['3rd Party'][subCategory].small[smallCategory] += amt;
                             }
-                            if (!subCategoryStats[category][subCategory]) {
-                                subCategoryStats[category][subCategory] = 0;
-                            }
-                            subCategoryStats[category][subCategory] += quantity;
+                        } else if (top3Categories.includes(effectiveCategory)) {
+                            if (!subCategoryStats[effectiveCategory]) subCategoryStats[effectiveCategory] = {};
+                            if (!subCategoryStats[effectiveCategory][subCategory]) subCategoryStats[effectiveCategory][subCategory] = 0;
+                            subCategoryStats[effectiveCategory][subCategory] += quantity;
                         }
 
                         if (index < 5) {
@@ -669,6 +680,41 @@
             return `<div class="top3-card">${html}</div>`;
         }
 
+        // 3rd Party 全展開：中分類 → 小分類，統計金額
+        function render3rdParty(stats) {
+            const subCats = Object.entries(stats)
+                .map(([name, data]) => ({ name, amt: data.amt, small: data.small }))
+                .sort((a, b) => b.amt - a.amt);
+
+            let html = `<div class="top3-category-title">3rd Party</div>`;
+            if (subCats.length === 0) {
+                html += `<p style="color:#666; padding-left:10px;">無 3rd Party 相關銷售資料</p>`;
+            } else {
+                subCats.forEach(sub => {
+                    html += `
+                        <div class="top3-item" style="flex-direction:column; align-items:flex-start; padding:8px 12px;">
+                            <div style="display:flex; justify-content:space-between; width:100%; font-weight:600; color:#1e3c72;">
+                                <span>${sub.name}</span>
+                                <span>$${Math.round(sub.amt).toLocaleString()}</span>
+                            </div>`;
+                    const smallItems = Object.entries(sub.small)
+                        .map(([k, v]) => ({ name: k, amt: v }))
+                        .sort((a, b) => b.amt - a.amt);
+                    if (smallItems.length > 0) {
+                        smallItems.forEach(sm => {
+                            html += `
+                            <div style="display:flex; justify-content:space-between; width:100%; padding-left:16px; color:#555; font-size:0.85em; margin-top:3px;">
+                                <span>└ ${sm.name}</span>
+                                <span>$${Math.round(sm.amt).toLocaleString()}</span>
+                            </div>`;
+                        });
+                    }
+                    html += `</div>`;
+                });
+            }
+            return `<div class="top3-card" style="min-width:280px;">${html}</div>`;
+        }
+
         function displayResults(productStats, accessoryStats, subCategoryStats, productCategories, accessoryCategories, top3Categories) {
             categoriesContainer.innerHTML = '';
 
@@ -705,13 +751,18 @@
 
             accessoriesTotalQuantity.textContent = `$${Math.round(accessoryTotal).toLocaleString()}`;
             
-            // 渲染 Top 3
+            // 渲染 Top 3（3rd Party 全展開中分類＋小分類）
             top3Container.innerHTML = '';
             top3Categories.forEach(category => {
-                const stats = subCategoryStats[category] || {};
-                const top3Html = renderTop3(category, stats);
+                let cardHtml;
+                if (category === '3rd Party') {
+                    cardHtml = render3rdParty(subCategoryStats['3rd Party'] || {});
+                } else {
+                    const stats = subCategoryStats[category] || {};
+                    cardHtml = renderTop3(category, stats);
+                }
                 const wrapper = document.createElement('div');
-                wrapper.innerHTML = top3Html;
+                wrapper.innerHTML = cardHtml;
                 top3Container.appendChild(wrapper.firstChild);
             });
 
